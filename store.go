@@ -7,7 +7,6 @@ package sessions
 import (
 	"encoding/base32"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"

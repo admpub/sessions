@@ -116,7 +116,9 @@ type sessionInfo struct {
 type contextKey int
 
 // registryKey is the key used to store the registry in the context.
-const registryKey contextKey = 0
+//const registryKey contextKey = 0
+
+const registryKey = `webx:sessionsRegistry`
 
 // GetRegistry returns a registry instance for the current request.
 func GetRegistry(context echo.Context) *Registry {
