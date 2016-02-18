@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/securecookie"
+	"github.com/webx-top/echo"
 )
 
 // Store is an interface for custom session stores.
@@ -21,16 +22,16 @@ import (
 // See CookieStore and FilesystemStore for examples.
 type Store interface {
 	// Get should return a cached session.
-	Get(r *http.Request, name string) (*Session, error)
+	Get(ctx echo.Context, name string) (*Session, error)
 
 	// New should create and return a new session.
 	//
 	// Note that New should never return a nil session, even in the case of
 	// an error if using the Registry infrastructure to cache the session.
-	New(r *http.Request, name string) (*Session, error)
+	New(ctx echo.Context, name string) (*Session, error)
 
 	// Save should persist session to the underlying store implementation.
-	Save(r *http.Request, w http.ResponseWriter, s *Session) error
+	Save(ctx echo.Context, s *Session) error
 }
 
 // CookieStore ----------------------------------------------------------------
@@ -76,8 +77,8 @@ type CookieStore struct {
 //
 // It returns a new session and an error if the session exists but could
 // not be decoded.
-func (s *CookieStore) Get(r *http.Request, name string) (*Session, error) {
-	return GetRegistry(r).Get(s, name)
+func (s *CookieStore) Get(ctx echo.Context, name string) (*Session, error) {
+	return GetRegistry(ctx).Get(s, name)
 }
 
 // New returns a session for the given name without adding it to the registry.
@@ -85,14 +86,14 @@ func (s *CookieStore) Get(r *http.Request, name string) (*Session, error) {
 // The difference between New() and Get() is that calling New() twice will
 // decode the session data twice, while Get() registers and reuses the same
 // decoded session after the first call.
-func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
+func (s *CookieStore) New(ctx echo.Context, name string) (*Session, error) {
 	session := NewSession(s, name)
 	opts := *s.Options
 	session.Options = &opts
 	session.IsNew = true
 	var err error
-	if c, errCookie := r.Cookie(name); errCookie == nil {
-		err = securecookie.DecodeMulti(name, c.Value, &session.Values,
+	if v := ctx.Request().Cookie(name); v != `` {
+		err = securecookie.DecodeMulti(name, v, &session.Values,
 			s.Codecs...)
 		if err == nil {
 			session.IsNew = false
@@ -102,14 +103,14 @@ func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
 }
 
 // Save adds a single session to the response.
-func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
+func (s *CookieStore) Save(ctx echo.Context,
 	session *Session) error {
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
 		s.Codecs...)
 	if err != nil {
 		return err
 	}
-	http.SetCookie(w, NewCookie(session.Name(), encoded, session.Options))
+	ctx.Response().SetCookie(NewCookie(session.Name(), encoded, session.Options))
 	return nil
 }
 
@@ -179,21 +180,21 @@ func (s *FilesystemStore) MaxLength(l int) {
 // Get returns a session for the given name after adding it to the registry.
 //
 // See CookieStore.Get().
-func (s *FilesystemStore) Get(r *http.Request, name string) (*Session, error) {
-	return GetRegistry(r).Get(s, name)
+func (s *FilesystemStore) Get(ctx echo.Context, name string) (*Session, error) {
+	return GetRegistry(ctx).Get(s, name)
 }
 
 // New returns a session for the given name without adding it to the registry.
 //
 // See CookieStore.New().
-func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
+func (s *FilesystemStore) New(ctx echo.Context, name string) (*Session, error) {
 	session := NewSession(s, name)
 	opts := *s.Options
 	session.Options = &opts
 	session.IsNew = true
 	var err error
-	if c, errCookie := r.Cookie(name); errCookie == nil {
-		err = securecookie.DecodeMulti(name, c.Value, &session.ID, s.Codecs...)
+	if v := ctx.Request().Cookie(name); v != `` {
+		err = securecookie.DecodeMulti(name, v, &session.ID, s.Codecs...)
 		if err == nil {
 			err = s.load(session)
 			if err == nil {
@@ -205,7 +206,7 @@ func (s *FilesystemStore) New(r *http.Request, name string) (*Session, error) {
 }
 
 // Save adds a single session to the response.
-func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
+func (s *FilesystemStore) Save(ctx echo.Context,
 	session *Session) error {
 	if session.ID == "" {
 		// Because the ID is used in the filename, encode it to
@@ -222,7 +223,7 @@ func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 	if err != nil {
 		return err
 	}
-	http.SetCookie(w, NewCookie(session.Name(), encoded, session.Options))
+	ctx.Response().SetCookie(NewCookie(session.Name(), encoded, session.Options))
 	return nil
 }
 

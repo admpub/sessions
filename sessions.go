@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/context"
+	"github.com/webx-top/echo"
 )
 
 // Default flashes key.
@@ -90,8 +90,8 @@ func (s *Session) AddFlash(value interface{}, vars ...string) {
 // Save is a convenience method to save this session. It is the same as calling
 // store.Save(request, response, session). You should call Save before writing to
 // the response or returning from the handler.
-func (s *Session) Save(r *http.Request, w http.ResponseWriter) error {
-	return s.store.Save(r, w, s)
+func (s *Session) Save(ctx echo.Context) error {
+	return s.store.Save(ctx, s)
 }
 
 // Name returns the name used to register the session.
@@ -119,22 +119,22 @@ type contextKey int
 const registryKey contextKey = 0
 
 // GetRegistry returns a registry instance for the current request.
-func GetRegistry(r *http.Request) *Registry {
-	registry := context.Get(r, registryKey)
+func GetRegistry(context echo.Context) *Registry {
+	registry := context.Get(registryKey)
 	if registry != nil {
 		return registry.(*Registry)
 	}
 	newRegistry := &Registry{
-		request:  r,
+		context:  context,
 		sessions: make(map[string]sessionInfo),
 	}
-	context.Set(r, registryKey, newRegistry)
+	context.Set(registryKey, newRegistry)
 	return newRegistry
 }
 
 // Registry stores sessions used during a request.
 type Registry struct {
-	request  *http.Request
+	context  echo.Context
 	sessions map[string]sessionInfo
 }
 
@@ -145,7 +145,7 @@ func (s *Registry) Get(store Store, name string) (session *Session, err error) {
 	if info, ok := s.sessions[name]; ok {
 		session, err = info.s, info.e
 	} else {
-		session, err = store.New(s.request, name)
+		session, err = store.New(s.context, name)
 		session.name = name
 		s.sessions[name] = sessionInfo{s: session, e: err}
 	}
@@ -154,14 +154,14 @@ func (s *Registry) Get(store Store, name string) (session *Session, err error) {
 }
 
 // Save saves all sessions registered for the current request.
-func (s *Registry) Save(w http.ResponseWriter) error {
+func (s *Registry) Save() error {
 	var errMulti MultiError
 	for name, info := range s.sessions {
 		session := info.s
 		if session.store == nil {
 			errMulti = append(errMulti, fmt.Errorf(
 				"sessions: missing store for session %q", name))
-		} else if err := session.store.Save(s.request, w, session); err != nil {
+		} else if err := session.store.Save(s.context, session); err != nil {
 			errMulti = append(errMulti, fmt.Errorf(
 				"sessions: error saving session %q -- %v", name, err))
 		}
@@ -179,8 +179,8 @@ func init() {
 }
 
 // Save saves all sessions used during the current request.
-func Save(r *http.Request, w http.ResponseWriter) error {
-	return GetRegistry(r).Save(w)
+func Save(ctx echo.Context) error {
+	return GetRegistry(ctx).Save()
 }
 
 // NewCookie returns an http.Cookie with the options set. It also sets
