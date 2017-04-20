@@ -91,7 +91,7 @@ func (s *CookieStore) New(ctx echo.Context, name string) (*Session, error) {
 	session.Options = &opts
 	session.IsNew = true
 	var err error
-	if v := ctx.Request().Cookie(name); len(v) > 0 {
+	if v := ctx.GetCookie(name); len(v) > 0 {
 		err = securecookie.DecodeMulti(name, v, &session.Values,
 			s.Codecs...)
 		if err == nil {
@@ -191,7 +191,7 @@ func (s *FilesystemStore) New(ctx echo.Context, name string) (*Session, error) {
 	session.Options = &opts
 	session.IsNew = true
 	var err error
-	if v := ctx.Request().Cookie(name); len(v) > 0 {
+	if v := ctx.GetCookie(name); len(v) > 0 {
 		err = securecookie.DecodeMulti(name, v, &session.ID, s.Codecs...)
 		if err == nil {
 			err = s.load(session)
