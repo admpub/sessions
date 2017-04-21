@@ -206,6 +206,14 @@ func (s *FilesystemStore) New(ctx echo.Context, name string) (*Session, error) {
 // Save adds a single session to the response.
 func (s *FilesystemStore) Save(ctx echo.Context,
 	session *Session) error {
+	// Delete if max-age is <= 0
+	if session.Options.MaxAge <= 0 {
+		if err := s.erase(session); err != nil {
+			return err
+		}
+		SetCookie(ctx, session.Name(), "", session.Options)
+		return nil
+	}
 	if len(session.ID) == 0 {
 		// Because the ID is used in the filename, encode it to
 		// use alphanumeric characters only.
@@ -223,6 +231,16 @@ func (s *FilesystemStore) Save(ctx echo.Context,
 	}
 	SetCookie(ctx, session.Name(), encoded, session.Options)
 	return nil
+}
+
+// delete session file
+func (s *FilesystemStore) erase(session *Session) error {
+	filename := filepath.Join(s.path, "session_"+session.ID)
+	fileMutex.RLock()
+	defer fileMutex.RUnlock()
+
+	err := os.Remove(filename)
+	return err
 }
 
 // MaxAge sets the maximum age for the store and the underlying cookie
