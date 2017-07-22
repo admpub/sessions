@@ -16,22 +16,6 @@ import (
 // Default flashes key.
 const flashesKey = "_flash"
 
-// Options --------------------------------------------------------------------
-
-// Options stores configuration for a session or session store.
-//
-// Fields are a subset of http.Cookie fields.
-type Options struct {
-	Path   string
-	Domain string
-	// MaxAge=0 means no 'Max-Age' attribute specified.
-	// MaxAge<0 means delete cookie now, equivalently 'Max-Age: 0'.
-	// MaxAge>0 means Max-Age attribute present and given in seconds.
-	MaxAge   int
-	Secure   bool
-	HttpOnly bool
-}
-
 // Session --------------------------------------------------------------------
 
 // NewSession is called by session stores to create a new session instance.
@@ -49,11 +33,10 @@ type Session struct {
 	// user data.
 	ID string
 	// Values contains the user-data for the session.
-	Values  map[interface{}]interface{}
-	Options *Options
-	IsNew   bool
-	store   Store
-	name    string
+	Values map[interface{}]interface{}
+	IsNew  bool
+	store  Store
+	name   string
 }
 
 // Flashes returns a slice of flash messages from the session.
@@ -189,7 +172,8 @@ func Save(ctx echo.Context) error {
 // NewCookie returns an http.Cookie with the options set. It also sets
 // the Expires field calculated based on the MaxAge value, for Internet
 // Explorer compatibility.
-func NewCookie(name, value string, options *Options) *http.Cookie {
+func NewCookie(ctx echo.Context, name, value string) *http.Cookie {
+	options := ctx.CookieOptions()
 	cookie := &http.Cookie{
 		Name:     name,
 		Value:    value,
@@ -210,15 +194,8 @@ func NewCookie(name, value string, options *Options) *http.Cookie {
 }
 
 // SetCookie for echo
-func SetCookie(ctx echo.Context, key string, value string, options *Options) {
-	ctx.SetCookie(
-		key, value,
-		options.MaxAge,
-		options.Path,
-		options.Domain,
-		options.Secure,
-		options.HttpOnly,
-	)
+func SetCookie(ctx echo.Context, key string, value string) {
+	ctx.SetCookie(key, value)
 }
 
 // Error ----------------------------------------------------------------------
