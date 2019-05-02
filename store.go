@@ -220,6 +220,9 @@ func (s *FilesystemStore) Save(ctx echo.Context,
 
 // delete session file
 func (s *FilesystemStore) erase(session *Session) error {
+	if len(session.ID) == 0 {
+		return nil
+	}
 	filename := filepath.Join(s.path, "session_"+session.ID)
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
