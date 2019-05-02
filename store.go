@@ -196,7 +196,7 @@ func (s *FilesystemStore) Save(ctx echo.Context,
 		if err := s.erase(session); err != nil {
 			return err
 		}
-		SetCookie(ctx, session.Name(), "")
+		SetCookie(ctx, session.Name(), "", -1)
 		return nil
 	}
 	if len(session.ID) == 0 {
