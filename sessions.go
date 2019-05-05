@@ -103,15 +103,17 @@ const registryKey = `webx:mw.sessions`
 
 // GetRegistry returns a registry instance for the current request.
 func GetRegistry(ctx echo.Context) *Registry {
-	registry, ok := ctx.Get(registryKey).(*Registry)
-	if ok {
-		return registry
+	if v, ok := ctx.Internal().Load(registryKey); ok {
+		registry, ok := v.(*Registry)
+		if ok {
+			return registry
+		}
 	}
-	registry = &Registry{
+	registry := &Registry{
 		context:  ctx,
 		sessions: make(map[string]sessionInfo),
 	}
-	ctx.Set(registryKey, registry)
+	ctx.Internal().Store(registryKey, registry)
 	return registry
 }
 
