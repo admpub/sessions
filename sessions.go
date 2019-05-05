@@ -193,8 +193,8 @@ func NewCookie(ctx echo.Context, name, value string) *http.Cookie {
 }
 
 // SetCookie for echo
-func SetCookie(ctx echo.Context, key string, value string) {
-	ctx.SetCookie(key, value)
+func SetCookie(ctx echo.Context, key string, value string, args ...interface{}) {
+	ctx.SetCookie(key, value, args...)
 }
 
 // Error ----------------------------------------------------------------------

@@ -191,12 +191,12 @@ func (s *FilesystemStore) New(ctx echo.Context, name string) (*Session, error) {
 // Save adds a single session to the response.
 func (s *FilesystemStore) Save(ctx echo.Context,
 	session *Session) error {
-	// Delete if max-age is <= 0
-	if ctx.CookieOptions().MaxAge <= 0 {
+	// Delete if max-age is < 0
+	if ctx.CookieOptions().MaxAge < 0 {
 		if err := s.erase(session); err != nil {
 			return err
 		}
-		SetCookie(ctx, session.Name(), "")
+		SetCookie(ctx, session.Name(), "", -1)
 		return nil
 	}
 	if len(session.ID) == 0 {
@@ -220,6 +220,9 @@ func (s *FilesystemStore) Save(ctx echo.Context,
 
 // delete session file
 func (s *FilesystemStore) erase(session *Session) error {
+	if len(session.ID) == 0 {
+		return nil
+	}
 	filename := filepath.Join(s.path, "session_"+session.ID)
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
