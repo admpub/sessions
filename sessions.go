@@ -193,6 +193,7 @@ func NewCookie(ctx echo.Context, name, value string) *http.Cookie {
 }
 
 // SetCookie for echo
+// @param:ctx,key,value,maxAge(seconds),path(/),domain,secure,httpOnly,sameSite(lax/strict/default)
 func SetCookie(ctx echo.Context, key string, value string, args ...interface{}) {
 	ctx.SetCookie(key, value, args...)
 }
