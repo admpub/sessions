@@ -208,9 +208,6 @@ func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	if err := s.save(session); err != nil {
 		return err
 	}
-	if !session.IsNew {
-		return nil
-	}
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.ID,
 		s.Codecs...)
 	if err != nil {
