@@ -30,8 +30,7 @@ type Store interface {
 	New(ctx echo.Context, name string) (*Session, error)
 
 	// Save should persist session to the underlying store implementation.
-	// @param args:maxAge(seconds),path(/),domain,secure,httpOnly,sameSite(lax/strict/default)
-	Save(ctx echo.Context, s *Session, args ...interface{}) error
+	Save(ctx echo.Context, s *Session) error
 }
 
 // CookieStore ----------------------------------------------------------------
@@ -96,13 +95,13 @@ func (s *CookieStore) New(ctx echo.Context, name string) (*Session, error) {
 }
 
 // Save adds a single session to the response.
-func (s *CookieStore) Save(ctx echo.Context, session *Session, args ...interface{}) error {
+func (s *CookieStore) Save(ctx echo.Context, session *Session) error {
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
 		s.Codecs...)
 	if err != nil {
 		return err
 	}
-	SetCookie(ctx, session.Name(), encoded, args...)
+	SetCookie(ctx, session.Name(), encoded)
 	return nil
 }
 
@@ -190,7 +189,7 @@ func (s *FilesystemStore) New(ctx echo.Context, name string) (*Session, error) {
 }
 
 // Save adds a single session to the response.
-func (s *FilesystemStore) Save(ctx echo.Context, session *Session, args ...interface{}) error {
+func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	// Delete if max-age is < 0
 	if ctx.CookieOptions().MaxAge < 0 {
 		if err := s.erase(session); err != nil {
@@ -214,7 +213,7 @@ func (s *FilesystemStore) Save(ctx echo.Context, session *Session, args ...inter
 	if err != nil {
 		return err
 	}
-	SetCookie(ctx, session.Name(), encoded, args...)
+	SetCookie(ctx, session.Name(), encoded)
 	return nil
 }
 
