@@ -33,6 +33,8 @@ type Store interface {
 
 	// Save should persist session to the underlying store implementation.
 	Save(ctx echo.Context, s *Session) error
+	// Remove server-side data
+	Remove(sessionID string) error
 }
 
 // IDGenerator session id generator
@@ -129,6 +131,10 @@ func (s *CookieStore) Save(ctx echo.Context, session *Session) error {
 		return err
 	}
 	SetCookie(ctx, session.Name(), encoded)
+	return nil
+}
+
+func (s *CookieStore) Remove(sessionID string) error {
 	return nil
 }
 
@@ -250,6 +256,18 @@ func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	}
 	SetCookie(ctx, session.Name(), encoded)
 	return nil
+}
+
+func (s *FilesystemStore) Remove(sessionID string) error {
+	if len(sessionID) == 0 {
+		return nil
+	}
+	filename := filepath.Join(s.path, "session_"+sessionID)
+	fileMutex.RLock()
+	defer fileMutex.RUnlock()
+
+	err := os.Remove(filename)
+	return err
 }
 
 // delete session file
