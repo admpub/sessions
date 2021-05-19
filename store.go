@@ -233,7 +233,7 @@ func (s *FilesystemStore) Reload(ctx echo.Context, session *Session) error {
 func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	// Delete if max-age is < 0
 	if ctx.CookieOptions().MaxAge < 0 {
-		if err := s.erase(session); err != nil && !os.IsNotExist(err) {
+		if err := s.erase(session); err != nil {
 			return err
 		}
 		SetCookie(ctx, session.Name(), "", -1)
@@ -267,20 +267,15 @@ func (s *FilesystemStore) Remove(sessionID string) error {
 	defer fileMutex.RUnlock()
 
 	err := os.Remove(filename)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	}
 	return err
 }
 
 // delete session file
 func (s *FilesystemStore) erase(session *Session) error {
-	if len(session.ID) == 0 {
-		return nil
-	}
-	filename := filepath.Join(s.path, "session_"+session.ID)
-	fileMutex.RLock()
-	defer fileMutex.RUnlock()
-
-	err := os.Remove(filename)
-	return err
+	return s.Remove(session.ID)
 }
 
 // MaxAge sets the maximum age for the store and the underlying cookie
