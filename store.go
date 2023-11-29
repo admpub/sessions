@@ -6,7 +6,6 @@ package sessions
 
 import (
 	"encoding/base32"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -300,7 +299,7 @@ func (s *FilesystemStore) save(session *Session) error {
 	filename := filepath.Join(s.path, "session_"+session.ID)
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
-	return ioutil.WriteFile(filename, []byte(encoded), 0600)
+	return os.WriteFile(filename, []byte(encoded), 0600)
 }
 
 // load reads a file and decodes its content into session.Values.
@@ -308,7 +307,7 @@ func (s *FilesystemStore) load(ctx echo.Context, session *Session) error {
 	filename := filepath.Join(s.path, "session_"+session.ID)
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
-	fdata, err := ioutil.ReadFile(filename)
+	fdata, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
