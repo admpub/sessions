@@ -159,12 +159,12 @@ var fileMutex sync.RWMutex
 // it will use os.TempDir().
 //
 // See NewCookieStore() for a description of the other parameters.
-func NewFilesystemStore(path string) *FilesystemStore {
+func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
 	if len(path) == 0 {
 		path = os.TempDir()
 	}
 	fs := &FilesystemStore{
-		Codecs: []securecookie.Codec{securecookie.NewLiteCodec()},
+		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		path:   path,
 	}
 	return fs
@@ -291,15 +291,14 @@ func (s *FilesystemStore) MaxAge(age int) {
 
 // save writes encoded session.Values to a file.
 func (s *FilesystemStore) save(session *Session) error {
-	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
-		s.Codecs...)
+	b, err := securecookie.Gob.Serialize(session.Values)
 	if err != nil {
 		return err
 	}
 	filename := filepath.Join(s.path, "session_"+session.ID)
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
-	return os.WriteFile(filename, []byte(encoded), 0600)
+	return os.WriteFile(filename, b, 0600)
 }
 
 // load reads a file and decodes its content into session.Values.
@@ -311,14 +310,7 @@ func (s *FilesystemStore) load(ctx echo.Context, session *Session) error {
 	if err != nil {
 		return err
 	}
-	if err = securecookie.DecodeMultiWithMaxAge(
-		session.Name(), string(fdata),
-		&session.Values,
-		ctx.CookieOptions().MaxAge,
-		s.Codecs...); err != nil {
-		return err
-	}
-	return nil
+	return securecookie.Gob.Deserialize(fdata, &session.Values)
 }
 
 func (s *FilesystemStore) DeleteExpired(maxAge float64) error {
