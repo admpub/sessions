@@ -159,12 +159,12 @@ var fileMutex sync.RWMutex
 // it will use os.TempDir().
 //
 // See NewCookieStore() for a description of the other parameters.
-func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
+func NewFilesystemStore(path string) *FilesystemStore {
 	if len(path) == 0 {
 		path = os.TempDir()
 	}
 	fs := &FilesystemStore{
-		Codecs: securecookie.CodecsFromPairs(keyPairs...),
+		Codecs: []securecookie.Codec{securecookie.NewLiteCodec()},
 		path:   path,
 	}
 	return fs
