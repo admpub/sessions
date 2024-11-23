@@ -16,6 +16,11 @@ import (
 	"github.com/webx-top/echo"
 )
 
+const (
+	// File name prefix for session files.
+	sessionFilePrefix = "session_"
+)
+
 // Store is an interface for custom session stores.
 //
 // See CookieStore and FilesystemStore for examples.
@@ -55,9 +60,6 @@ type IDGenerator interface {
 // It is recommended to use an authentication key with 32 or 64 bytes.
 // The encryption key, if set, must be either 16, 24, or 32 bytes to select
 // AES-128, AES-192, or AES-256 modes.
-//
-// Use the convenience function securecookie.GenerateRandomKey() to create
-// strong keys.
 func NewCookieStore(keyPairs ...[]byte) *CookieStore {
 	cs := &CookieStore{
 		Codecs: securecookie.CodecsFromPairs(keyPairs...),
@@ -228,6 +230,8 @@ func (s *FilesystemStore) Reload(ctx echo.Context, session *Session) error {
 	return err
 }
 
+var base32RawStdEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
+
 // Save adds a single session to the response.
 func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	// Delete if max-age is < 0
@@ -241,9 +245,8 @@ func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	if len(session.ID) == 0 {
 		// Because the ID is used in the filename, encode it to
 		// use alphanumeric characters only.
-		session.ID = strings.TrimRight(
-			base32.StdEncoding.EncodeToString(
-				securecookie.GenerateRandomKey(32)), "=")
+		session.ID = base32RawStdEncoding.EncodeToString(
+			securecookie.GenerateRandomKey(32))
 	}
 	if err := s.save(session); err != nil {
 		return err
@@ -261,7 +264,7 @@ func (s *FilesystemStore) Remove(sessionID string) error {
 	if len(sessionID) == 0 {
 		return nil
 	}
-	filename := filepath.Join(s.path, "session_"+sessionID)
+	filename := filepath.Join(s.path, sessionFilePrefix+filepath.Base(sessionID))
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
 
@@ -295,7 +298,7 @@ func (s *FilesystemStore) save(session *Session) error {
 	if err != nil {
 		return err
 	}
-	filename := filepath.Join(s.path, "session_"+session.ID)
+	filename := filepath.Join(s.path, sessionFilePrefix+filepath.Base(session.ID))
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 	return os.WriteFile(filename, b, 0600)
@@ -303,7 +306,7 @@ func (s *FilesystemStore) save(session *Session) error {
 
 // load reads a file and decodes its content into session.Values.
 func (s *FilesystemStore) load(ctx echo.Context, session *Session) error {
-	filename := filepath.Join(s.path, "session_"+session.ID)
+	filename := filepath.Join(s.path, sessionFilePrefix+filepath.Base(session.ID))
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
 	fdata, err := os.ReadFile(filename)
@@ -324,7 +327,7 @@ func (s *FilesystemStore) DeleteExpired(maxAge float64) error {
 		if info.IsDir() {
 			return err
 		}
-		if !strings.HasPrefix(info.Name(), `session_`) {
+		if !strings.HasPrefix(info.Name(), sessionFilePrefix) {
 			return err
 		}
 		if time.Since(info.ModTime()).Seconds() > maxAge {

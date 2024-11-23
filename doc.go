@@ -3,21 +3,21 @@
 // license that can be found in the LICENSE file.
 
 /*
-Package gorilla/sessions provides cookie and filesystem sessions and
+Package sessions provides cookie and filesystem sessions and
 infrastructure for custom session backends.
 
 The key features are:
 
-	* Simple API: use it as an easy way to set signed (and optionally
-	  encrypted) cookies.
-	* Built-in backends to store sessions in cookies or the filesystem.
-	* Flash messages: session values that last until read.
-	* Convenient way to switch session persistency (aka "remember me") and set
-	  other attributes.
-	* Mechanism to rotate authentication and encryption keys.
-	* Multiple sessions per request, even using different backends.
-	* Interfaces and infrastructure for custom session backends: sessions from
-	  different stores can be retrieved and batch-saved using a common API.
+  - Simple API: use it as an easy way to set signed (and optionally
+    encrypted) cookies.
+  - Built-in backends to store sessions in cookies or the filesystem.
+  - Flash messages: session values that last until read.
+  - Convenient way to switch session persistency (aka "remember me") and set
+    other attributes.
+  - Mechanism to rotate authentication and encryption keys.
+  - Multiple sessions per request, even using different backends.
+  - Interfaces and infrastructure for custom session backends: sessions from
+    different stores can be retrieved and batch-saved using a common API.
 
 Let's start with an example that shows the sessions API in a nutshell:
 
@@ -26,7 +26,12 @@ Let's start with an example that shows the sessions API in a nutshell:
 		"github.com/webx-top/echo"
 	)
 
-	var store = sessions.NewCookieStore([]byte("something-very-secret"))
+	// Note: Don't store your key in your source code. Pass it via an
+	// environmental variable, or flag (or both), and don't accidentally commit it
+	// alongside your code. Ensure your key is sufficiently random - i.e. use Go's
+	// crypto/rand or securecookie.GenerateRandomKey(32) and persist the result.
+	// Ensure SESSION_KEY exists in the environment, or sessions will fail.
+	var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 
 	func MyHandler(ctx echo.Context) error {
 		// Get a session. We're ignoring the error resulted from decoding an
@@ -56,14 +61,6 @@ session.Save(r, w), and either display an error message or otherwise handle it.
 Save must be called before writing to the response, otherwise the session
 cookie will not be sent to the client.
 
-Important Note: If you aren't using gorilla/mux, you need to wrap your handlers
-with context.ClearHandler as or else you will leak memory! An easy way to do this
-is to wrap the top-level mux when calling http.ListenAndServe:
-
-    http.ListenAndServe(":8080", context.ClearHandler(http.DefaultServeMux))
-
-The ClearHandler function is provided by the gorilla/context package.
-
 That's all you need to know for the basic usage. Let's take a look at other
 options, starting with flash messages.
 
@@ -79,7 +76,7 @@ flashes, call session.Flashes(). Here is an example:
 			return error
 		}
 
-		// Get the previously flashes, if any.
+		// Get the previous flashes, if any.
 		if flashes := session.Flashes(); len(flashes) > 0 {
 			// Use the flash values.
 		} else {
@@ -119,10 +116,10 @@ so it is easy to register new datatypes for storage in sessions:
 	}
 
 As it's not possible to pass a raw type as a parameter to a function, gob.Register()
-relies on us passing it an empty pointer to the type as a parameter. In the example
-above we've passed it a pointer to a struct and a pointer to a custom type
-representing a map[string]interface. This will then allow us to serialise/deserialise
-values of those types to and from our sessions.
+relies on us passing it a value of the desired type. In the example above we've passed
+it a pointer to a struct and a pointer to a custom type representing a
+map[string]interface. (We could have passed non-pointer values if we wished.) This will
+then allow us to serialise/deserialise values of those types to and from our sessions.
 
 Note that because session values are stored in a map[string]interface{}, there's
 a need to type-assert data when retrieving it. We'll use the Person struct we registered above:
