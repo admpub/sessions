@@ -184,6 +184,21 @@ func Save(ctx echo.Context) error {
 	return GetRegistry(ctx).Save(ctx)
 }
 
+var cookieSameSiteNames = map[string]http.SameSite{
+	``:       http.SameSiteDefaultMode,
+	`lax`:    http.SameSiteLaxMode,
+	`strict`: http.SameSiteStrictMode,
+	`none`:   http.SameSiteNoneMode,
+}
+
+func CookieSameSite(sameSite string) http.SameSite {
+	v, y := cookieSameSiteNames[sameSite]
+	if y {
+		return v
+	}
+	return cookieSameSiteNames[``]
+}
+
 // NewCookie returns an http.Cookie with the options set. It also sets
 // the Expires field calculated based on the MaxAge value, for Internet
 // Explorer compatibility.
@@ -196,6 +211,7 @@ func NewCookie(ctx echo.Context, name, value string) *http.Cookie {
 		Domain:   options.Domain,
 		MaxAge:   options.MaxAge,
 		Secure:   options.Secure,
+		SameSite: CookieSameSite(options.SameSite),
 		HttpOnly: options.HttpOnly,
 	}
 	if options.MaxAge > 0 {

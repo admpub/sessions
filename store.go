@@ -213,7 +213,7 @@ func (s *FilesystemStore) New(ctx echo.Context, name string) (*Session, error) {
 			ctx.CookieOptions().MaxAge,
 			s.Codecs...)
 		if err == nil {
-			err = s.load(ctx, session)
+			err = s.load(session)
 			if err == nil {
 				session.IsNew = false
 			}
@@ -223,7 +223,7 @@ func (s *FilesystemStore) New(ctx echo.Context, name string) (*Session, error) {
 }
 
 func (s *FilesystemStore) Reload(ctx echo.Context, session *Session) error {
-	err := s.load(ctx, session)
+	err := s.load(session)
 	if err == nil {
 		session.IsNew = false
 	}
@@ -292,6 +292,8 @@ func (s *FilesystemStore) MaxAge(age int) {
 	}
 }
 
+var emptyGob, _ = securecookie.Gob.Serialize(make(map[interface{}]interface{}))
+
 // save writes encoded session.Values to a file.
 func (s *FilesystemStore) save(session *Session) error {
 	b, err := securecookie.Gob.Serialize(session.Values)
@@ -305,7 +307,7 @@ func (s *FilesystemStore) save(session *Session) error {
 }
 
 // load reads a file and decodes its content into session.Values.
-func (s *FilesystemStore) load(ctx echo.Context, session *Session) error {
+func (s *FilesystemStore) load(session *Session) error {
 	filename := filepath.Join(s.path, sessionFilePrefix+filepath.Base(session.ID))
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
@@ -316,10 +318,11 @@ func (s *FilesystemStore) load(ctx echo.Context, session *Session) error {
 	return securecookie.Gob.Deserialize(fdata, &session.Values)
 }
 
-func (s *FilesystemStore) DeleteExpired(maxAge float64) error {
+func (s *FilesystemStore) DeleteExpired(maxAge float64, emptyDataAge float64) error {
 	if maxAge <= 0 {
 		return nil
 	}
+	emptyLength := int64(len(emptyGob))
 	err := filepath.Walk(s.path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -332,6 +335,11 @@ func (s *FilesystemStore) DeleteExpired(maxAge float64) error {
 		}
 		if time.Since(info.ModTime()).Seconds() > maxAge {
 			err = os.Remove(path)
+			return err
+		}
+		if emptyDataAge > 0 && emptyLength > 0 && info.Size() == emptyLength && time.Since(info.ModTime()).Seconds() > emptyDataAge {
+			err = os.Remove(path)
+			return err
 		}
 		return err
 	})
