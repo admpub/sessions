@@ -295,7 +295,11 @@ func (s *FilesystemStore) MaxAge(age int) {
 var emptyGob, _ = securecookie.Gob.Serialize(make(map[interface{}]interface{}))
 
 func SizeIsEmptyGob(size int64) bool {
-	return size == int64(len(emptyGob))
+	return size == int64(EmptyGobSize())
+}
+
+func EmptyGobSize() int {
+	return len(emptyGob)
 }
 
 // save writes encoded session.Values to a file.
