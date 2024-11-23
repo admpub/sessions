@@ -1,4 +1,4 @@
-module github.com/gorilla/sessions
+module github.com/admpub/sessions
 
 go 1.23
 

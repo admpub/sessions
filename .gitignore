@@ -1,4 +1,3 @@
 /.vscode
-go.mod
 go.sum
 coverage.coverprofile
