@@ -5,7 +5,6 @@
 package sessions
 
 import (
-	"encoding/gob"
 	"fmt"
 	"net/http"
 	"time"
@@ -176,7 +175,7 @@ func (s *Registry) Save(ctx echo.Context) error {
 // Helpers --------------------------------------------------------------------
 
 func init() {
-	gob.Register([]interface{}{})
+	RegisterGob([]interface{}{})
 }
 
 // Save saves all sessions used during the current request.

@@ -6,6 +6,7 @@ package sessions
 
 import (
 	"encoding/base32"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -180,6 +181,7 @@ func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
 type FilesystemStore struct {
 	Codecs []securecookie.Codec
 	path   string
+	debug  bool
 }
 
 // MaxLength restricts the maximum length of new sessions to l.
@@ -191,6 +193,10 @@ func (s *FilesystemStore) MaxLength(l int) {
 			codec.MaxLength(l)
 		}
 	}
+}
+
+func (s *FilesystemStore) SetDebug(on bool) {
+	s.debug = on
 }
 
 // Get returns a session for the given name after adding it to the registry.
@@ -232,6 +238,10 @@ func (s *FilesystemStore) Reload(ctx echo.Context, session *Session) error {
 
 var base32RawStdEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
 
+func makeFileSessionID() string {
+	return base32RawStdEncoding.EncodeToString(securecookie.GenerateRandomKey(32))
+}
+
 // Save adds a single session to the response.
 func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	// Delete if max-age is < 0
@@ -245,8 +255,7 @@ func (s *FilesystemStore) Save(ctx echo.Context, session *Session) error {
 	if len(session.ID) == 0 {
 		// Because the ID is used in the filename, encode it to
 		// use alphanumeric characters only.
-		session.ID = base32RawStdEncoding.EncodeToString(
-			securecookie.GenerateRandomKey(32))
+		session.ID = makeFileSessionID()
 	}
 	if err := s.save(session); err != nil {
 		return err
@@ -264,7 +273,7 @@ func (s *FilesystemStore) Remove(sessionID string) error {
 	if len(sessionID) == 0 {
 		return nil
 	}
-	filename := filepath.Join(s.path, sessionFilePrefix+filepath.Base(sessionID))
+	filename := s.sessionFile(sessionID)
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
 
@@ -273,6 +282,28 @@ func (s *FilesystemStore) Remove(sessionID string) error {
 		return nil
 	}
 	return err
+}
+
+func (s *FilesystemStore) sessionFile(sessionID string) string {
+	return filepath.Join(s.path, sessionFilePrefix+filepath.Base(sessionID))
+}
+
+func (s *FilesystemStore) size(sessionID string) (int64, error) {
+	if len(sessionID) == 0 {
+		return 0, nil
+	}
+	filename := s.sessionFile(sessionID)
+	fileMutex.RLock()
+	defer fileMutex.RUnlock()
+
+	fi, err := os.Stat(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return fi.Size(), err
 }
 
 // delete session file
@@ -295,11 +326,12 @@ func (s *FilesystemStore) MaxAge(age int) {
 var emptyGob, _ = securecookie.Gob.Serialize(make(map[interface{}]interface{}))
 
 func SizeIsEmptyGob(size int64) bool {
-	return size == int64(EmptyGobSize())
+	return size == EmptyGobSize()
 }
 
-func EmptyGobSize() int {
-	return len(emptyGob)
+func EmptyGobSize() int64 {
+	size := len(emptyGob)
+	return int64(size)
 }
 
 // save writes encoded session.Values to a file.
@@ -308,7 +340,7 @@ func (s *FilesystemStore) save(session *Session) error {
 	if err != nil {
 		return err
 	}
-	filename := filepath.Join(s.path, sessionFilePrefix+filepath.Base(session.ID))
+	filename := s.sessionFile(session.ID)
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 	return os.WriteFile(filename, b, 0600)
@@ -316,7 +348,7 @@ func (s *FilesystemStore) save(session *Session) error {
 
 // load reads a file and decodes its content into session.Values.
 func (s *FilesystemStore) load(session *Session) error {
-	filename := filepath.Join(s.path, sessionFilePrefix+filepath.Base(session.ID))
+	filename := s.sessionFile(session.ID)
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
 	fdata, err := os.ReadFile(filename)
@@ -327,10 +359,10 @@ func (s *FilesystemStore) load(session *Session) error {
 }
 
 func (s *FilesystemStore) DeleteExpired(maxAge float64, emptyDataAge float64) error {
-	if maxAge <= 0 {
+	if maxAge <= 0 && emptyDataAge <= 0 {
 		return nil
 	}
-	emptyLength := int64(len(emptyGob))
+	emptyLength := EmptyGobSize()
 	err := filepath.Walk(s.path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -341,11 +373,18 @@ func (s *FilesystemStore) DeleteExpired(maxAge float64, emptyDataAge float64) er
 		if !strings.HasPrefix(info.Name(), sessionFilePrefix) {
 			return err
 		}
-		if time.Since(info.ModTime()).Seconds() > maxAge {
+		age := time.Since(info.ModTime()).Seconds()
+		if age > maxAge {
+			if s.debug {
+				fmt.Printf("delete %s : {age: %v} > {maxAge: %v}\n", info.Name(), age, maxAge)
+			}
 			err = os.Remove(path)
 			return err
 		}
-		if emptyDataAge > 0 && emptyLength > 0 && info.Size() == emptyLength && time.Since(info.ModTime()).Seconds() > emptyDataAge {
+		if emptyDataAge > 0 && emptyLength > 0 && info.Size() == emptyLength && age > emptyDataAge {
+			if s.debug {
+				fmt.Printf("delete %s : {age: %v} > {emptyDataAge: %v}\n", info.Name(), age, emptyDataAge)
+			}
 			err = os.Remove(path)
 			return err
 		}
